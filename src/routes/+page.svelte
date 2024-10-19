@@ -1,48 +1,43 @@
-<script>
+<script lang="ts">
 	import { onMount } from 'svelte';
 	import axios from 'axios';
 	import JSZip from 'jszip';
+	import fileSaver from 'file-saver';
+	const { saveAs } = fileSaver;
+	import GalleryItem from '$lib/components/GalleryItem.svelte';
 
 	let searchQuery = '';
 	let images = [];
 	let selectedImages = [];
 	let loading = false;
 	let error = '';
-	let apiKeyStatus = 'unchecked';
+	let currentPage = 1;
+	let totalPages = 0;
+	let itemsPerPage = 30;
 
-	const UNSPLASH_ACCESS_KEY = import.meta.env.VITE_UNSPLASH_ACCESS_KEY;
+	import { UNSPLASH_ACCESS_KEY } from '$lib/constant';
 
-	async function checkApiKey() {
-		if (!UNSPLASH_ACCESS_KEY) {
-			apiKeyStatus = 'missing';
-			error =
-				'Unsplash API key is not set. Please set the VITE_UNSPLASH_ACCESS_KEY environment variable.';
-			return false;
-		}
+	let selectAllState = {};
 
-		try {
-			const response = await axios.get('https://api.unsplash.com/photos/random', {
-				params: { client_id: UNSPLASH_ACCESS_KEY }
-			});
-			if (response.status === 200) {
-				apiKeyStatus = 'valid';
-				return true;
+	function selectAllImages() {
+		selectAllState[currentPage] = !selectAllState[currentPage];
+
+		let allCheckboxes = document.querySelectorAll('.gallery__checkbox');
+
+		allCheckboxes.forEach((checkbox, index) => {
+			(checkbox as HTMLInputElement).checked = selectAllState[currentPage];
+			if (selectAllState[currentPage]) {
+				if (!selectedImages.some((img) => img.id === images[index].id)) {
+					selectedImages = [...selectedImages, images[index]];
+				}
+			} else {
+				selectedImages = selectedImages.filter((img) => img.id !== images[index].id);
 			}
-		} catch (err) {
-			console.error('Error checking API key:', err);
-			apiKeyStatus = 'invalid';
-			error =
-				'Invalid Unsplash API key. Please check your VITE_UNSPLASH_ACCESS_KEY environment variable.';
-			return false;
-		}
+		});
 	}
 
-	async function searchImages() {
-		if (!searchQuery.trim()) return;
-		if (apiKeyStatus === 'unchecked') {
-			const isValid = await checkApiKey();
-			if (!isValid) return;
-		}
+	async function searchImages(page = 1) {
+		if (!searchQuery.trim() || loading) return;
 
 		loading = true;
 		error = '';
@@ -50,16 +45,22 @@
 			const response = await axios.get(`https://api.unsplash.com/search/photos`, {
 				params: {
 					query: searchQuery,
-					per_page: 30,
+					page: page,
+					per_page: itemsPerPage,
 					client_id: UNSPLASH_ACCESS_KEY
 				}
 			});
 			images = response.data.results;
-			console.log(images);
+			totalPages = Math.ceil(response.data.total / itemsPerPage);
+			currentPage = page;
+
+			// Initialize selectAllState for the new page if it doesn't exist
+			if (!selectAllState.hasOwnProperty(currentPage)) {
+				selectAllState[currentPage] = false;
+			}
 		} catch (err) {
 			console.error('Error fetching images:', err);
 			error = 'An error occurred while fetching images. Please try again later.';
-			images = [];
 		}
 		loading = false;
 	}
@@ -70,142 +71,154 @@
 			: [...selectedImages, image];
 	}
 
-	function selectAllImages() {
-		if (selectedImages.length === images.length) {
-			// If all images are already selected, deselect all
-			selectedImages = [];
+	function generatePageNumbers() {
+		const pageNumbers = [];
+		const maxVisiblePages = 5;
+
+		if (totalPages <= maxVisiblePages) {
+			for (let i = 1; i <= totalPages; i++) {
+				pageNumbers.push(i);
+			}
 		} else {
-			// Otherwise, select all images
-			selectedImages = [...images];
+			if (currentPage <= 3) {
+				for (let i = 1; i <= 4; i++) {
+					pageNumbers.push(i);
+				}
+				pageNumbers.push('...');
+				pageNumbers.push(totalPages);
+			} else if (currentPage >= totalPages - 2) {
+				pageNumbers.push(1);
+				pageNumbers.push('...');
+				for (let i = totalPages - 3; i <= totalPages; i++) {
+					pageNumbers.push(i);
+				}
+			} else {
+				pageNumbers.push(1);
+				pageNumbers.push('...');
+				for (let i = currentPage - 1; i <= currentPage + 1; i++) {
+					pageNumbers.push(i);
+				}
+				pageNumbers.push('...');
+				pageNumbers.push(totalPages);
+			}
 		}
+		return pageNumbers;
 	}
 
 	async function downloadImages() {
-		if (selectedImages.length === 0) return;
+		if (selectedImages.length === 0) {
+			alert('Please select at least one image to download.');
+			return;
+		}
 
-		const zip = new JSZip();
-		const imagePromises = selectedImages.map(async (image, index) => {
-			try {
-				const response = await axios.get(image.urls.full, { responseType: 'arraybuffer' });
-				zip.file(`image-${index + 1}.jpg`, response.data);
-			} catch (err) {
-				console.error(`Error downloading image ${index + 1}:`, err);
-				throw new Error(`Failed to download image ${index + 1}`);
-			}
-		});
+		loading = true;
+		error = '';
 
 		try {
-			await Promise.all(imagePromises);
-			const content = await zip.generateAsync({ type: 'blob' });
-			const url = URL.createObjectURL(content);
-			const link = document.createElement('a');
-			link.href = url;
-			link.download = 'selected-images.zip';
-			document.body.appendChild(link);
-			link.click();
-			document.body.removeChild(link);
+			// Request permission to access the file system
+			const dirHandle = await window.showDirectoryPicker();
+
+			for (const image of selectedImages) {
+				try {
+					// Fetch the image
+					const response = await fetch(image.urls.regular);
+					const blob = await response.blob();
+
+					// Create a new file in the selected directory
+					const fileHandle = await dirHandle.getFileHandle(`${image.id}.jpg`, { create: true });
+					const writable = await fileHandle.createWritable();
+					await writable.write(blob);
+					await writable.close();
+				} catch (error) {
+					console.error(`Failed to download image ${image.id}:`, error);
+				}
+			}
+
+			alert('Download completed');
 		} catch (err) {
-			console.error('Error downloading images:', err);
-			error = 'An error occurred while downloading images. Please try again.';
+			console.error('Error in downloadImages:', err);
+			error = err.message || 'An error occurred while downloading images. Please try again.';
+		} finally {
+			loading = false;
 		}
 	}
 
-	onMount(() => {
-		const resizeObserver = new ResizeObserver((entries) => {
-			for (let entry of entries) {
-				const item = entry.target;
-				const rowSpan = Math.ceil(item.querySelector('img').getBoundingClientRect().height / 10);
-				item.style.gridRowEnd = `span ${rowSpan}`;
-			}
-		});
-
-		document.querySelectorAll('.item').forEach((item) => {
-			resizeObserver.observe(item);
-		});
-
-		return () => {
-			resizeObserver.disconnect();
-		};
-	});
-
-	onMount(async () => {
-		await checkApiKey();
-	});
+	function isImageSelected(image) {
+		return selectedImages.some((img) => img.id === image.id);
+	}
 </script>
 
-<svelte:head>
-	<title>Stock Image Search by Khoa</title>
-	<meta name="description" content="Search and download stock images" />
-</svelte:head>
-<h1>Stock Image Search by Khoa @wentallout</h1>
+<h1>Stock Images Grabber</h1>
 
-<main>
-	{#if apiKeyStatus === 'valid'}
-		<div class="search-container">
-			<input
-				type="text"
-				bind:value={searchQuery}
-				placeholder="Enter keywords to search for images"
-				on:keyup={(e) => e.key === 'Enter' && searchImages()}
-			/>
-			<button on:click={searchImages}>Search</button>
-		</div>
+<div class="search-container">
+	<input
+		type="text"
+		bind:value={searchQuery}
+		placeholder="Enter keywords to search for images"
+		on:keyup={(e) => e.key === 'Enter' && searchImages()} />
+	<button on:click={() => searchImages()}>Search</button>
+</div>
 
-		{#if error}
-			<p class="error">{error}</p>
-		{/if}
-
-		{#if loading}
-			<p>Loading...</p>
-		{:else if images.length > 0}
-			<div class="gallery">
-				{#each images as image (image.id)}
-					<figure class="gallery__item" on:click={() => toggleImageSelection(image)}>
-						<img
-							class="gallery__image"
-							src={image.urls.small}
-							alt={image.alt_description}
-							loading="lazy"
-						/>
-						<figcaption class="gallery__caption">
-							<p class="gallery__title">{image.description || 'Untitled'}</p>
-							<p class="gallery__uploader">
-								by <a
-									class="gallery__uploader-link"
-									href={`https://unsplash.com/@${image.user.username}`}
-									target="_blank"
-									rel="noopener noreferrer"
-									on:click|stopPropagation>{image.user.name}</a
-								>
-							</p>
-						</figcaption>
-						<div class="gallery__overlay">
-							<input
-								class="gallery__checkbox"
-								type="checkbox"
-								checked={selectedImages.some((img) => img.id === image.id)}
-								on:change|stopPropagation
-							/>
-						</div>
-					</figure>
-				{/each}
-			</div>
-		{/if}
-	{:else}
-		<p class="error">{error}</p>
-	{/if}
-</main>
+{#if error}
+	<p class="error">{error}</p>
+{/if}
 
 {#if images.length > 0}
 	<div class="download-button-container">
-		<button on:click={selectAllImages} class="select-all-button"> Select All Images </button>
-		<button on:click={downloadImages} class="download-button">
-			Download Selected Images ({selectedImages.length})
-		</button>
+		{#if totalPages > 0}
+			<div class="pagination">
+				{#each generatePageNumbers() as pageNumber}
+					{#if pageNumber === '...'}
+						<span class="ellipsis">...</span>
+					{:else}
+						<button
+							class="page-number"
+							class:active={pageNumber === currentPage}
+							on:click={() => searchImages(pageNumber)}>
+							{pageNumber}
+						</button>
+					{/if}
+				{/each}
+			</div>
+		{/if}
+
+		<div class="download-buttons">
+			<button on:click={selectAllImages} class="select-all-button">
+				{selectAllState[currentPage] ? 'Deselect All' : 'Select All'}
+			</button>
+			<button on:click={downloadImages} class="download-button" disabled={loading}>
+				{loading ? 'Downloading...' : `Download Selected Images (${selectedImages.length})`}
+			</button>
+		</div>
 	</div>
 {/if}
 
+<div class="gallery">
+	{#each images as image (image.id)}
+		<GalleryItem
+			{image}
+			isSelected={isImageSelected(image)}
+			onToggleSelection={toggleImageSelection} />
+	{/each}
+</div>
+
+{#if loading}
+	<div class="loading">Loading images...</div>
+{/if}
+
 <style>
+	.download-buttons {
+		display: flex;
+		flex-direction: row;
+		justify-content: space-between;
+		align-items: center;
+		gap: 2rem;
+
+		& > * {
+			flex-grow: 1;
+		}
+	}
+
 	main {
 		padding: 1rem;
 		margin: 0 auto;
@@ -333,6 +346,7 @@
 		background-color: rgba(255, 255, 255, 0.9);
 		padding: 1rem;
 		display: flex;
+		flex-direction: column;
 		justify-content: center;
 		gap: 1rem;
 		box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.1);
@@ -404,12 +418,14 @@
 		position: relative;
 		border-radius: 4px;
 		overflow: hidden;
-		cursor: pointer;
+		background-color: #f0f0f0;
+		transition: aspect-ratio 0.3s ease;
 	}
 
 	.gallery__image {
 		width: 100%;
-		height: auto;
+		height: 100%;
+		object-fit: cover;
 		display: block;
 	}
 
@@ -495,5 +511,86 @@
 		.gallery {
 			column-count: 2;
 		}
+	}
+
+	.loading,
+	.no-more {
+		text-align: center;
+		padding: 1rem;
+		font-style: italic;
+		color: #666;
+	}
+
+	.search-container {
+		display: flex;
+		justify-content: center;
+		margin-bottom: 1rem;
+	}
+
+	.search-container input {
+		padding: 0.5rem;
+		font-size: 1rem;
+		width: 300px;
+	}
+
+	.search-container button {
+		padding: 0.5rem 1rem;
+		font-size: 1rem;
+		background-color: var(--color-theme-1);
+		color: white;
+		border: none;
+		cursor: pointer;
+	}
+
+	.loading {
+		position: fixed;
+		bottom: 20px;
+		right: 20px;
+		background-color: rgba(0, 0, 0, 0.7);
+		color: white;
+		padding: 10px 20px;
+		border-radius: 20px;
+		z-index: 1000;
+	}
+
+	.pagination {
+		display: flex;
+		justify-content: center;
+		margin-top: 1rem;
+		gap: 0.5rem;
+	}
+
+	.page-number {
+		padding: 0.5rem 1rem;
+		border: 1px solid #ccc;
+		cursor: pointer;
+		color: black;
+		background-color: white;
+	}
+
+	.page-number.active {
+		background-color: var(--color-theme-1);
+		color: white;
+	}
+
+	.ellipsis {
+		padding: 0.5rem;
+	}
+
+	.loading {
+		text-align: center;
+		padding: 1rem;
+		font-style: italic;
+	}
+
+	.download-button:disabled {
+		background-color: #cccccc;
+		cursor: not-allowed;
+	}
+
+	.error {
+		color: red;
+		text-align: center;
+		margin-top: 1rem;
 	}
 </style>
