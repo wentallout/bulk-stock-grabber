@@ -15,7 +15,8 @@
 	async function checkApiKey() {
 		if (!UNSPLASH_ACCESS_KEY) {
 			apiKeyStatus = 'missing';
-			error = 'Unsplash API key is not set. Please set the VITE_UNSPLASH_ACCESS_KEY environment variable.';
+			error =
+				'Unsplash API key is not set. Please set the VITE_UNSPLASH_ACCESS_KEY environment variable.';
 			return false;
 		}
 
@@ -30,7 +31,8 @@
 		} catch (err) {
 			console.error('Error checking API key:', err);
 			apiKeyStatus = 'invalid';
-			error = 'Invalid Unsplash API key. Please check your VITE_UNSPLASH_ACCESS_KEY environment variable.';
+			error =
+				'Invalid Unsplash API key. Please check your VITE_UNSPLASH_ACCESS_KEY environment variable.';
 			return false;
 		}
 	}
@@ -62,11 +64,11 @@
 	}
 
 	function toggleImageSelection(image) {
-		const index = selectedImages.findIndex(img => img.id === image.id);
+		const index = selectedImages.findIndex((img) => img.id === image.id);
 		if (index === -1) {
 			selectedImages = [...selectedImages, image];
 		} else {
-			selectedImages = selectedImages.filter(img => img.id !== image.id);
+			selectedImages = selectedImages.filter((img) => img.id !== image.id);
 		}
 	}
 
@@ -100,18 +102,36 @@
 		}
 	}
 
+	onMount(() => {
+		const resizeObserver = new ResizeObserver((entries) => {
+			for (let entry of entries) {
+				const item = entry.target;
+				const rowSpan = Math.ceil(item.querySelector('img').getBoundingClientRect().height / 10);
+				item.style.gridRowEnd = `span ${rowSpan}`;
+			}
+		});
+
+		document.querySelectorAll('.item').forEach((item) => {
+			resizeObserver.observe(item);
+		});
+
+		return () => {
+			resizeObserver.disconnect();
+		};
+	});
+
 	onMount(async () => {
 		await checkApiKey();
 	});
 </script>
 
 <svelte:head>
-	<title>Stock Image Search</title>
+	<title>Stock Image Search by Khoa</title>
 	<meta name="description" content="Search and download stock images" />
 </svelte:head>
+<h1>Stock Image Search by Khoa @wentallout</h1>
 
 <main>
-	<h1>Stock Image Search</h1>
 	{#if apiKeyStatus === 'valid'}
 		<div class="search-container">
 			<input
@@ -130,14 +150,15 @@
 		{#if loading}
 			<p>Loading...</p>
 		{:else if images.length > 0}
-			<div class="masonry-grid">
+			<div class="masonry">
 				{#each images as image (image.id)}
-					<div class="masonry-item" style="--aspect-ratio: {image.height / image.width};">
+					<div class="item">
 						<img src={image.urls.small} alt={image.alt_description} loading="lazy" />
 						<div class="image-overlay">
 							<input
+								class="image-checkbox"
 								type="checkbox"
-								checked={selectedImages.some(img => img.id === image.id)}
+								checked={selectedImages.some((img) => img.id === image.id)}
 								on:change={() => toggleImageSelection(image)}
 							/>
 						</div>
@@ -163,7 +184,6 @@
 <style>
 	main {
 		padding: 1rem;
-		max-width: 1200px;
 		margin: 0 auto;
 		padding-bottom: 60px;
 	}
@@ -199,38 +219,59 @@
 		cursor: not-allowed;
 	}
 
-	.masonry-grid {
+	.masonry {
 		display: grid;
 		grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-		grid-gap: 1rem;
-		grid-auto-flow: dense;
+		grid-auto-rows: minmax(150px, auto);
+		gap: 1rem;
 	}
 
-	.masonry-item {
+	.item {
+		flex: 1 0 100%;
+		margin-bottom: 1rem;
+
 		position: relative;
-		overflow: hidden;
 		border-radius: 4px;
-		box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+		overflow: hidden;
+
 		transition: transform 0.3s ease;
 	}
 
-	.masonry-item::before {
-		content: '';
+	.item img {
+		box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 		display: block;
-		padding-bottom: calc(100% * var(--aspect-ratio));
-	}
-
-	.masonry-item img {
-		position: absolute;
-		top: 0;
-		left: 0;
 		width: 100%;
-		height: 100%;
+		height: auto;
 		object-fit: cover;
 	}
 
-	.masonry-item:hover {
-		transform: scale(1.02);
+	.item:hover {
+		transform: scale(1.05);
+	}
+
+	/* Responsive breakpoints */
+	@media screen and (min-width: 400px) {
+		.item {
+			flex-basis: calc(50% - 0.5rem);
+		}
+	}
+
+	@media screen and (min-width: 600px) {
+		.item {
+			flex-basis: calc(33.33% - 0.67rem);
+		}
+	}
+
+	@media screen and (min-width: 800px) {
+		.item {
+			flex-basis: calc(25% - 0.75rem);
+		}
+	}
+
+	@media screen and (min-width: 1000px) {
+		.item {
+			flex-basis: calc(20% - 0.8rem);
+		}
 	}
 
 	.image-overlay {
@@ -239,20 +280,16 @@
 		left: 0;
 		right: 0;
 		bottom: 0;
-		background-color: rgba(0, 0, 0, 0.3);
+
 		display: flex;
 		align-items: flex-start;
 		justify-content: flex-end;
 		padding: 0.5rem;
-		opacity: 0;
+
 		transition: opacity 0.3s ease;
 	}
 
-	.masonry-item:hover .image-overlay {
-		opacity: 1;
-	}
-
-	.image-overlay input[type="checkbox"] {
+	.image-checkbox {
 		width: 20px;
 		height: 20px;
 	}
