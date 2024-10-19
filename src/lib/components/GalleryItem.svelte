@@ -73,7 +73,13 @@
 	}
 
 	.gallery__item.selected {
-		outline: 2px solid blue;
+		outline: 5px solid blue;
+
+		& .gallery__image {
+			scale: 1.2;
+			filter: brightness(0.5) sepia(1.5);
+			transition: all 0.3s ease;
+		}
 	}
 
 	.gallery__image {

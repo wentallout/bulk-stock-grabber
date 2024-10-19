@@ -1,9 +1,6 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
 	import axios from 'axios';
-	import JSZip from 'jszip';
-	import fileSaver from 'file-saver';
-	const { saveAs } = fileSaver;
+
 	import GalleryItem from '$lib/components/GalleryItem.svelte';
 
 	let searchQuery = '';
