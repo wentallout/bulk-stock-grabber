@@ -65,12 +65,9 @@
 	}
 
 	function toggleImageSelection(image) {
-		const index = selectedImages.findIndex((img) => img.id === image.id);
-		if (index === -1) {
-			selectedImages = [...selectedImages, image];
-		} else {
-			selectedImages = selectedImages.filter((img) => img.id !== image.id);
-		}
+		selectedImages = selectedImages.some((img) => img.id === image.id)
+			? selectedImages.filter((img) => img.id !== image.id)
+			: [...selectedImages, image];
 	}
 
 	function selectAllImages() {
@@ -163,12 +160,23 @@
 		{:else if images.length > 0}
 			<div class="gallery">
 				{#each images as image (image.id)}
-					<figure class="gallery__item">
-						<img class="gallery__image" src={image.urls.small} alt={image.alt_description} loading="lazy" />
+					<figure class="gallery__item" on:click={() => toggleImageSelection(image)}>
+						<img
+							class="gallery__image"
+							src={image.urls.small}
+							alt={image.alt_description}
+							loading="lazy"
+						/>
 						<figcaption class="gallery__caption">
 							<p class="gallery__title">{image.description || 'Untitled'}</p>
 							<p class="gallery__uploader">
-								by <a class="gallery__uploader-link" href={`https://unsplash.com/@${image.user.username}`} target="_blank" rel="noopener noreferrer">{image.user.name}</a>
+								by <a
+									class="gallery__uploader-link"
+									href={`https://unsplash.com/@${image.user.username}`}
+									target="_blank"
+									rel="noopener noreferrer"
+									on:click|stopPropagation>{image.user.name}</a
+								>
 							</p>
 						</figcaption>
 						<div class="gallery__overlay">
@@ -176,14 +184,12 @@
 								class="gallery__checkbox"
 								type="checkbox"
 								checked={selectedImages.some((img) => img.id === image.id)}
-								on:change={() => toggleImageSelection(image)}
-								/>
+								on:change|stopPropagation
+							/>
 						</div>
 					</figure>
 				{/each}
 			</div>
-		{:else if searchQuery && !error}
-			<p>No images found. Try a different search term.</p>
 		{/if}
 	{:else}
 		<p class="error">{error}</p>
@@ -320,6 +326,7 @@
 
 	.download-button-container {
 		position: fixed;
+		z-index: 9999;
 		bottom: 0;
 		left: 0;
 		right: 0;
@@ -397,6 +404,7 @@
 		position: relative;
 		border-radius: 4px;
 		overflow: hidden;
+		cursor: pointer;
 	}
 
 	.gallery__image {
@@ -464,6 +472,7 @@
 		height: 20px;
 		opacity: 0.7;
 		transition: opacity 0.3s ease;
+		pointer-events: none;
 	}
 
 	.gallery__checkbox:hover {

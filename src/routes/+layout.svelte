@@ -1,6 +1,7 @@
 <script>
 	import Header from '../lib/components/Header.svelte';
 	import '../app.css';
+	import Footer from '$lib/components/Footer.svelte';
 </script>
 
 <Header />
@@ -9,9 +10,7 @@
 	<slot />
 </main>
 
-<footer>
-	<p>visit <a href="https://kit.svelte.dev">kit.svelte.dev</a> to learn SvelteKit</p>
-</footer>
+<Footer />
 
 <style>
 	main {
