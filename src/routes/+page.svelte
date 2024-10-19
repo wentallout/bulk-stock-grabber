@@ -55,6 +55,7 @@
 				}
 			});
 			images = response.data.results;
+			console.log(images);
 		} catch (err) {
 			console.error('Error fetching images:', err);
 			error = 'An error occurred while fetching images. Please try again later.';
@@ -69,6 +70,16 @@
 			selectedImages = [...selectedImages, image];
 		} else {
 			selectedImages = selectedImages.filter((img) => img.id !== image.id);
+		}
+	}
+
+	function selectAllImages() {
+		if (selectedImages.length === images.length) {
+			// If all images are already selected, deselect all
+			selectedImages = [];
+		} else {
+			// Otherwise, select all images
+			selectedImages = [...images];
 		}
 	}
 
@@ -150,19 +161,25 @@
 		{#if loading}
 			<p>Loading...</p>
 		{:else if images.length > 0}
-			<div class="masonry">
+			<div class="gallery">
 				{#each images as image (image.id)}
-					<div class="item">
-						<img src={image.urls.small} alt={image.alt_description} loading="lazy" />
-						<div class="image-overlay">
+					<figure class="gallery__item">
+						<img class="gallery__image" src={image.urls.small} alt={image.alt_description} loading="lazy" />
+						<figcaption class="gallery__caption">
+							<p class="gallery__title">{image.description || 'Untitled'}</p>
+							<p class="gallery__uploader">
+								by <a class="gallery__uploader-link" href={`https://unsplash.com/@${image.user.username}`} target="_blank" rel="noopener noreferrer">{image.user.name}</a>
+							</p>
+						</figcaption>
+						<div class="gallery__overlay">
 							<input
-								class="image-checkbox"
+								class="gallery__checkbox"
 								type="checkbox"
 								checked={selectedImages.some((img) => img.id === image.id)}
 								on:change={() => toggleImageSelection(image)}
-							/>
+								/>
 						</div>
-					</div>
+					</figure>
 				{/each}
 			</div>
 		{:else if searchQuery && !error}
@@ -173,8 +190,9 @@
 	{/if}
 </main>
 
-{#if selectedImages.length > 0}
+{#if images.length > 0}
 	<div class="download-button-container">
+		<button on:click={selectAllImages} class="select-all-button"> Select All Images </button>
 		<button on:click={downloadImages} class="download-button">
 			Download Selected Images ({selectedImages.length})
 		</button>
@@ -309,10 +327,12 @@
 		padding: 1rem;
 		display: flex;
 		justify-content: center;
+		gap: 1rem;
 		box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.1);
 	}
 
-	.download-button {
+	.download-button,
+	.select-all-button {
 		background-color: var(--color-theme-1);
 		color: white;
 		border: none;
@@ -322,7 +342,149 @@
 		transition: background-color 0.3s ease;
 	}
 
-	.download-button:hover {
+	.download-button:hover,
+	.select-all-button:hover {
 		background-color: var(--color-theme-2);
+	}
+
+	figcaption {
+		padding: 0.5rem;
+		background-color: rgba(255, 255, 255, 0.8);
+		position: absolute;
+		bottom: 0;
+		left: 0;
+		right: 0;
+		transition: opacity 0.3s ease;
+	}
+
+	.image-title {
+		margin: 0;
+		font-weight: bold;
+		font-size: 0.9rem;
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
+	}
+
+	.image-uploader {
+		margin: 0;
+		font-size: 0.8rem;
+	}
+
+	.image-uploader a {
+		color: var(--color-theme-1);
+		text-decoration: none;
+	}
+
+	.image-uploader a:hover {
+		text-decoration: underline;
+	}
+
+	figure:hover figcaption {
+		opacity: 1;
+	}
+
+	.gallery {
+		column-count: 5;
+		column-gap: 1rem;
+	}
+
+	.gallery__item {
+		margin: 0 0 1rem 0;
+		display: inline-block;
+		width: 100%;
+		break-inside: avoid;
+		position: relative;
+		border-radius: 4px;
+		overflow: hidden;
+	}
+
+	.gallery__image {
+		width: 100%;
+		height: auto;
+		display: block;
+	}
+
+	.gallery__caption {
+		padding: 0.5rem;
+		background-color: rgba(255, 255, 255, 0.8);
+		position: absolute;
+		bottom: 0;
+		left: 0;
+		right: 0;
+		opacity: 0;
+		transition: opacity 0.3s ease;
+		z-index: 2;
+	}
+
+	.gallery__title {
+		margin: 0;
+		font-weight: bold;
+		font-size: 0.9rem;
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
+	}
+
+	.gallery__uploader {
+		margin: 0;
+		font-size: 0.8rem;
+	}
+
+	.gallery__uploader-link {
+		color: var(--color-theme-1);
+		text-decoration: none;
+		position: relative;
+		z-index: 3;
+	}
+
+	.gallery__uploader-link:hover {
+		text-decoration: underline;
+	}
+
+	.gallery__item:hover .gallery__caption {
+		opacity: 1;
+	}
+
+	.gallery__overlay {
+		position: absolute;
+		top: 0;
+		left: 0;
+		right: 0;
+		bottom: 0;
+		display: flex;
+		align-items: flex-start;
+		justify-content: flex-end;
+		padding: 0.5rem;
+		z-index: 1;
+	}
+
+	.gallery__checkbox {
+		width: 20px;
+		height: 20px;
+		opacity: 0.7;
+		transition: opacity 0.3s ease;
+	}
+
+	.gallery__checkbox:hover {
+		opacity: 1;
+	}
+
+	@media screen and (max-width: 1200px) {
+		.gallery {
+			column-count: 4;
+		}
+	}
+
+	@media screen and (max-width: 900px) {
+		.gallery {
+			column-count: 3;
+		}
+	}
+
+	@media screen and (max-width: 600px) {
+		.gallery {
+			column-count: 2;
+		}
 	}
 </style>
