@@ -1,10 +1,16 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
-	import Footer from './Footer.svelte';
+	import { run, stopPropagation, createBubbler } from 'svelte/legacy';
 
-	export let image;
-	export let isSelected: boolean;
-	export let onToggleSelection;
+	const bubble = createBubbler();
+	import { onMount } from 'svelte';
+
+	interface Props {
+		image: any;
+		isSelected: boolean;
+		onToggleSelection: any;
+	}
+
+	let { image, isSelected = $bindable(), onToggleSelection }: Props = $props();
 
 	function handleToggle() {
 		onToggleSelection(image);
@@ -12,9 +18,7 @@
 		checkboxElement.checked = !checkboxElement.checked;
 	}
 
-	$: isSelected;
-
-	let checkboxElement: HTMLInputElement;
+	let checkboxElement: HTMLInputElement = $state();
 
 	// Add this function to handle the title click
 	function handleTitleClick(event: Event) {
@@ -22,7 +26,7 @@
 	}
 </script>
 
-<div class="gallery__item" class:selected={isSelected} on:click|stopPropagation={handleToggle}>
+<div class="gallery__item" class:selected={isSelected} onclick={handleToggle}>
 	<img class="gallery__image" src={image.urls.small} alt={image.alt_description} loading="lazy" />
 	<div class="gallery__caption">
 		<a
@@ -30,7 +34,7 @@
 			target="_blank"
 			rel="noopener noreferrer"
 			class="gallery__title-link"
-			on:click|stopPropagation={handleTitleClick}>
+			onclick={handleTitleClick}>
 			<p class="gallery__title">{image.description || 'Untitled'}</p>
 		</a>
 		<p class="gallery__uploader">
@@ -39,7 +43,7 @@
 				href={`https://unsplash.com/@${image.user.username}`}
 				target="_blank"
 				rel="noopener noreferrer"
-				on:click|stopPropagation>{image.user.name}</a>
+				onclick={stopPropagation(bubble('click'))}>{image.user.name}</a>
 
 			on
 			<a

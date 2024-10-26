@@ -2,12 +2,14 @@
 	import Header from '../lib/components/Header.svelte';
 	import '../app.css';
 	import Footer from '$lib/components/Footer.svelte';
+	/** @type {{children?: import('svelte').Snippet}} */
+	let { children } = $props();
 </script>
 
 <Header />
 
 <main>
-	<slot />
+	{@render children?.()}
 </main>
 
 <Footer />

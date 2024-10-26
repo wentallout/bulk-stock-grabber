@@ -1,29 +1,33 @@
 <script lang="ts">
 	import axios from 'axios';
+	import JSZip from 'jszip';
+	import { saveAs } from 'file-saver';
 
 	import GalleryItem from '$lib/components/GalleryItem.svelte';
 
-	let searchQuery = '';
-	let images = [];
-	let selectedImages = [];
-	let loading = false;
-	let error = '';
-	let currentPage = 1;
-	let totalPages = 0;
+	let searchQuery = $state('');
+	let images = $state([]);
+	let selectedImages = $state([]);
+	let loading = $state(false);
+	let error = $state('');
+	let currentPage = $state(1);
+	let totalPages = $state(0);
 	let itemsPerPage = 30;
 
 	import { UNSPLASH_ACCESS_KEY } from '$lib/constant';
 
-	let selectAllState = {};
+	let selectAllState = $state(new Map<number, boolean>());
+
+	// Add this import at the top of your file
 
 	function selectAllImages() {
-		selectAllState[currentPage] = !selectAllState[currentPage];
+		selectAllState.set(currentPage, !selectAllState.get(currentPage));
 
 		let allCheckboxes = document.querySelectorAll('.gallery__checkbox');
 
 		allCheckboxes.forEach((checkbox, index) => {
-			(checkbox as HTMLInputElement).checked = selectAllState[currentPage];
-			if (selectAllState[currentPage]) {
+			(checkbox as HTMLInputElement).checked = selectAllState.get(currentPage);
+			if (selectAllState.get(currentPage)) {
 				if (!selectedImages.some((img) => img.id === images[index].id)) {
 					selectedImages = [...selectedImages, images[index]];
 				}
@@ -48,12 +52,13 @@
 				}
 			});
 			images = response.data.results;
+			console.log(images);
 			totalPages = Math.ceil(response.data.total / itemsPerPage);
 			currentPage = page;
 
 			// Initialize selectAllState for the new page if it doesn't exist
-			if (!selectAllState.hasOwnProperty(currentPage)) {
-				selectAllState[currentPage] = false;
+			if (!selectAllState.has(currentPage)) {
+				selectAllState.set(currentPage, false);
 			}
 		} catch (err) {
 			console.error('Error fetching images:', err);
@@ -112,26 +117,18 @@
 		error = '';
 
 		try {
-			// Request permission to access the file system
-			const dirHandle = await window.showDirectoryPicker();
+			const zip = new JSZip();
 
 			for (const image of selectedImages) {
-				try {
-					// Fetch the image
-					const response = await fetch(image.urls.regular);
-					const blob = await response.blob();
-
-					// Create a new file in the selected directory
-					const fileHandle = await dirHandle.getFileHandle(`${image.id}.jpg`, { create: true });
-					const writable = await fileHandle.createWritable();
-					await writable.write(blob);
-					await writable.close();
-				} catch (error) {
-					console.error(`Failed to download image ${image.id}:`, error);
-				}
+				const response = await fetch(image.urls.full);
+				const blob = await response.blob();
+				zip.file(`${image.id}.jpg`, blob);
 			}
 
-			alert('Download completed');
+			const content = await zip.generateAsync({ type: 'blob' });
+			saveAs(content, 'unsplash_images.zip');
+
+			alert('Download completed!');
 		} catch (err) {
 			console.error('Error in downloadImages:', err);
 			error = err.message || 'An error occurred while downloading images. Please try again.';
@@ -152,8 +149,8 @@
 		type="text"
 		bind:value={searchQuery}
 		placeholder="Enter keywords to search for images"
-		on:keyup={(e) => e.key === 'Enter' && searchImages()} />
-	<button on:click={() => searchImages()}>Search</button>
+		onkeyup={(e) => e.key === 'Enter' && searchImages()} />
+	<button onclick={() => searchImages()}>Search</button>
 </div>
 
 {#if error}
@@ -171,7 +168,7 @@
 						<button
 							class="page-number"
 							class:active={pageNumber === currentPage}
-							on:click={() => searchImages(pageNumber)}>
+							onclick={() => searchImages(pageNumber)}>
 							{pageNumber}
 						</button>
 					{/if}
@@ -180,10 +177,10 @@
 		{/if}
 
 		<div class="download-buttons">
-			<button on:click={selectAllImages} class="select-all-button">
-				{selectAllState[currentPage] ? 'Deselect All' : 'Select All'}
+			<button onclick={selectAllImages} class="select-all-button">
+				{selectAllState.get(currentPage) ? 'Deselect All' : 'Select All'}
 			</button>
-			<button on:click={downloadImages} class="download-button" disabled={loading}>
+			<button onclick={downloadImages} disabled={loading} class="download-button">
 				{loading ? 'Downloading...' : `Download Selected Images (${selectedImages.length})`}
 			</button>
 		</div>
@@ -192,10 +189,7 @@
 
 <div class="gallery">
 	{#each images as image (image.id)}
-		<GalleryItem
-			{image}
-			isSelected={isImageSelected(image)}
-			onToggleSelection={toggleImageSelection} />
+		<GalleryItem {image} onToggleSelection={toggleImageSelection} />
 	{/each}
 </div>
 
