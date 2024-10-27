@@ -1,9 +1,19 @@
 <script lang="ts">
 	import axios from 'axios';
 	import JSZip from 'jszip';
-	import { saveAs } from 'file-saver';
 
 	import GalleryItem from '$lib/components/GalleryItem.svelte';
+
+	import { onMount } from 'svelte';
+	import { UNSPLASH_ACCESS_KEY } from '$lib/constant';
+
+	import PhMagnifyingGlass from '~icons/ph/magnifying-glass';
+
+	import PhDownload from '~icons/ph/download';
+
+	import PhCheckSquare from '~icons/ph/check-square';
+
+	import PhX from '~icons/ph/x';
 
 	let searchQuery = $state('');
 	let images = $state([]);
@@ -13,28 +23,40 @@
 	let currentPage = $state(1);
 	let totalPages = $state(0);
 	let itemsPerPage = 30;
+	import saveAs from 'file-saver';
+	import { toast } from '$lib/stores/toastStore.svelte';
 
-	import { UNSPLASH_ACCESS_KEY } from '$lib/constant';
+	// Replace the existing selectAllState with a simple boolean
+	let selectAll = $state(false);
 
-	let selectAllState = $state(new Map<number, boolean>());
+	let downloadLoading = $state(false);
+	let downloadProgress = $state(0);
 
-	// Add this import at the top of your file
+	onMount(async () => {
+		await fetchEditorialImages();
+	});
 
-	function selectAllImages() {
-		selectAllState.set(currentPage, !selectAllState.get(currentPage));
-
-		let allCheckboxes = document.querySelectorAll('.gallery__checkbox');
-
-		allCheckboxes.forEach((checkbox, index) => {
-			(checkbox as HTMLInputElement).checked = selectAllState.get(currentPage);
-			if (selectAllState.get(currentPage)) {
-				if (!selectedImages.some((img) => img.id === images[index].id)) {
-					selectedImages = [...selectedImages, images[index]];
+	async function fetchEditorialImages() {
+		loading = true;
+		error = '';
+		try {
+			const response = await fetch(
+				`https://api.unsplash.com/photos?page=${currentPage}&per_page=${itemsPerPage}`,
+				{
+					headers: {
+						Authorization: `Client-ID ${UNSPLASH_ACCESS_KEY}`
+					}
 				}
-			} else {
-				selectedImages = selectedImages.filter((img) => img.id !== images[index].id);
-			}
-		});
+			);
+			if (!response.ok) throw new Error('Failed to fetch images');
+			const data = await response.json();
+			images = data;
+		} catch (err) {
+			console.error('Error fetching editorial images:', err);
+			error = err.message || 'An error occurred while fetching images';
+		} finally {
+			loading = false;
+		}
 	}
 
 	async function searchImages(page = 1) {
@@ -42,23 +64,24 @@
 
 		loading = true;
 		error = '';
+
+		console.log('test items per page', itemsPerPage);
 		try {
 			const response = await axios.get(`https://api.unsplash.com/search/photos`, {
 				params: {
 					query: searchQuery,
 					page: page,
-					per_page: itemsPerPage,
+					per_page: itemsPerPage, // This should be 60 as defined earlier
 					client_id: UNSPLASH_ACCESS_KEY
 				}
 			});
 			images = response.data.results;
-			console.log(images);
 			totalPages = Math.ceil(response.data.total / itemsPerPage);
 			currentPage = page;
 
 			// Initialize selectAllState for the new page if it doesn't exist
-			if (!selectAllState.has(currentPage)) {
-				selectAllState.set(currentPage, false);
+			if (!selectAll) {
+				selectAll = false;
 			}
 		} catch (err) {
 			console.error('Error fetching images:', err);
@@ -113,44 +136,63 @@
 			return;
 		}
 
-		loading = true;
+		downloadLoading = true;
+		downloadProgress = 0;
 		error = '';
 
 		try {
 			const zip = new JSZip();
+			const totalImages = selectedImages.length;
 
-			for (const image of selectedImages) {
+			for (let i = 0; i < totalImages; i++) {
+				const image = selectedImages[i];
 				const response = await fetch(image.urls.full);
 				const blob = await response.blob();
 				zip.file(`${image.id}.jpg`, blob);
+
+				// Update progress
+				downloadProgress = ((i + 1) / totalImages) * 100;
 			}
 
 			const content = await zip.generateAsync({ type: 'blob' });
 			saveAs(content, 'unsplash_images.zip');
 
-			alert('Download completed!');
+			toast.push('Download completed!');
+			// alert('Download completed!');
 		} catch (err) {
 			console.error('Error in downloadImages:', err);
 			error = err.message || 'An error occurred while downloading images. Please try again.';
 		} finally {
-			loading = false;
+			downloadLoading = false;
+			downloadProgress = 0;
 		}
 	}
 
-	function isImageSelected(image) {
-		return selectedImages.some((img) => img.id === image.id);
+	function selectAllImages() {
+		selectAll = !selectAll;
+		if (selectAll) {
+			selectedImages = [...images];
+		} else {
+			selectedImages = [];
+		}
 	}
 </script>
 
-<h1>Stock Images Grabber</h1>
-
-<div class="search-container">
-	<input
-		type="text"
-		bind:value={searchQuery}
-		placeholder="Enter keywords to search for images"
-		onkeyup={(e) => e.key === 'Enter' && searchImages()} />
-	<button onclick={() => searchImages()}>Search</button>
+<div class="search-container pad">
+	<div class="search__title">
+		<p>Free images. Download in bulk.</p>
+	</div>
+	<div class="input-container">
+		<input
+			class="search__input"
+			type="text"
+			bind:value={searchQuery}
+			placeholder="Search photos and illustrations"
+			onkeyup={(e) => e.key === 'Enter' && searchImages()} />
+		<button onclick={() => searchImages()}>
+			<PhMagnifyingGlass width="24" height="24" />
+		</button>
+	</div>
 </div>
 
 {#if error}
@@ -158,7 +200,7 @@
 {/if}
 
 {#if images.length > 0}
-	<div class="download-button-container">
+	<div class="pad fixed-menu">
 		{#if totalPages > 0}
 			<div class="pagination">
 				{#each generatePageNumbers() as pageNumber}
@@ -175,29 +217,60 @@
 				{/each}
 			</div>
 		{/if}
+		{#if selectedImages.length > 0}
+			<div class="download-buttons">
+				<button onclick={selectAllImages} class="btn select-all-button">
+					{#if selectAll}
+						<PhCheckSquare width="24" height="24" />
+					{:else}
+						<PhX width="24" height="24" />
+					{/if}
+					{selectAll ? 'Deselect All' : 'Select All Images'}
+				</button>
 
-		<div class="download-buttons">
-			<button onclick={selectAllImages} class="select-all-button">
-				{selectAllState.get(currentPage) ? 'Deselect All' : 'Select All'}
-			</button>
-			<button onclick={downloadImages} disabled={loading} class="download-button">
-				{loading ? 'Downloading...' : `Download Selected Images (${selectedImages.length})`}
-			</button>
-		</div>
+				<button onclick={downloadImages} disabled={downloadLoading} class="btn download-button">
+					<PhDownload width="24" height="24" />
+					{downloadLoading
+						? 'Downloading...'
+						: `Download Selected Images (${selectedImages.length})`}
+				</button>
+			</div>
+		{/if}
 	</div>
 {/if}
 
-<div class="gallery">
+{#if downloadLoading}
+	<div class="progress-bar">
+		<div class="progress" style="width: {downloadProgress}%"></div>
+	</div>
+{/if}
+
+<div class="gallery pad">
+	{#if loading}
+		<div class="loading">Loading images...</div>
+	{/if}
 	{#each images as image (image.id)}
-		<GalleryItem {image} onToggleSelection={toggleImageSelection} />
+		<GalleryItem
+			{image}
+			isSelected={selectAll || selectedImages.some((img) => img.id === image.id)}
+			onToggleSelection={toggleImageSelection} />
 	{/each}
 </div>
 
-{#if loading}
-	<div class="loading">Loading images...</div>
-{/if}
-
 <style>
+	.input-container {
+		display: flex;
+		flex-direction: row;
+	}
+
+	.search__title {
+		display: flex;
+		flex-direction: row;
+		font-weight: 600;
+		font-size: var(--step-3);
+		margin-bottom: var(--space-xs);
+	}
+
 	.download-buttons {
 		display: flex;
 		flex-direction: row;
@@ -210,116 +283,26 @@
 		}
 	}
 
-	main {
-		padding: 1rem;
-		margin: 0 auto;
-		padding-bottom: 60px;
-	}
-
-	h1 {
-		text-align: center;
-		color: var(--color-theme-1);
-	}
-
 	.search-container {
 		display: flex;
+		flex-direction: column;
 		justify-content: center;
-		margin-bottom: 1rem;
-	}
+		margin-bottom: var(--space-s);
+		width: 100%;
+		height: 30dvh;
+		background: url('/images/sj-1.jpg') no-repeat bottom center;
+		background-size: cover;
+		border-radius: 1rem;
+		padding: var(--space-s) var(--space-m);
 
-	input {
-		width: 300px;
-		padding: 0.5rem;
-		font-size: 1rem;
-	}
-
-	button {
-		padding: 0.5rem 1rem;
-		font-size: 1rem;
-		background-color: var(--color-theme-1);
-		color: white;
-		border: none;
-		cursor: pointer;
+		& input {
+			padding: 1rem;
+		}
 	}
 
 	button:disabled {
 		background-color: #ccc;
 		cursor: not-allowed;
-	}
-
-	.masonry {
-		display: grid;
-		grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-		grid-auto-rows: minmax(150px, auto);
-		gap: 1rem;
-	}
-
-	.item {
-		flex: 1 0 100%;
-		margin-bottom: 1rem;
-
-		position: relative;
-		border-radius: 4px;
-		overflow: hidden;
-
-		transition: transform 0.3s ease;
-	}
-
-	.item img {
-		box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-		display: block;
-		width: 100%;
-		height: auto;
-		object-fit: cover;
-	}
-
-	.item:hover {
-		transform: scale(1.05);
-	}
-
-	/* Responsive breakpoints */
-	@media screen and (min-width: 400px) {
-		.item {
-			flex-basis: calc(50% - 0.5rem);
-		}
-	}
-
-	@media screen and (min-width: 600px) {
-		.item {
-			flex-basis: calc(33.33% - 0.67rem);
-		}
-	}
-
-	@media screen and (min-width: 800px) {
-		.item {
-			flex-basis: calc(25% - 0.75rem);
-		}
-	}
-
-	@media screen and (min-width: 1000px) {
-		.item {
-			flex-basis: calc(20% - 0.8rem);
-		}
-	}
-
-	.image-overlay {
-		position: absolute;
-		top: 0;
-		left: 0;
-		right: 0;
-		bottom: 0;
-
-		display: flex;
-		align-items: flex-start;
-		justify-content: flex-end;
-		padding: 0.5rem;
-
-		transition: opacity 0.3s ease;
-	}
-
-	.image-checkbox {
-		width: 20px;
-		height: 20px;
 	}
 
 	.error {
@@ -328,162 +311,42 @@
 		margin-bottom: 1rem;
 	}
 
-	.download-button-container {
+	.fixed-menu {
 		position: fixed;
 		z-index: 9999;
 		bottom: 0;
-		left: 0;
-		right: 0;
-		background-color: rgba(255, 255, 255, 0.9);
-		padding: 1rem;
+		left: 50%;
+		transform: translateX(-50%);
+		background-color: rgba(0, 0, 0, 0.8);
+		padding: 0.5rem;
 		display: flex;
 		flex-direction: column;
 		justify-content: center;
-		gap: 1rem;
-		box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.1);
+		gap: var(--space-s);
+		color: white;
+		margin: 0;
+		width: 100%;
 	}
 
 	.download-button,
 	.select-all-button {
-		background-color: var(--color-theme-1);
-		color: white;
+		gap: 0.5rem;
+		color: black;
 		border: none;
-		padding: 0.5rem 1rem;
-		font-size: 1rem;
+
 		cursor: pointer;
 		transition: background-color 0.3s ease;
 	}
 
-	.download-button:hover,
-	.select-all-button:hover {
-		background-color: var(--color-theme-2);
-	}
-
-	figcaption {
-		padding: 0.5rem;
-		background-color: rgba(255, 255, 255, 0.8);
-		position: absolute;
-		bottom: 0;
-		left: 0;
-		right: 0;
-		transition: opacity 0.3s ease;
-	}
-
-	.image-title {
-		margin: 0;
-		font-weight: bold;
-		font-size: 0.9rem;
-		white-space: nowrap;
-		overflow: hidden;
-		text-overflow: ellipsis;
-	}
-
-	.image-uploader {
-		margin: 0;
-		font-size: 0.8rem;
-	}
-
-	.image-uploader a {
-		color: var(--color-theme-1);
-		text-decoration: none;
-	}
-
-	.image-uploader a:hover {
-		text-decoration: underline;
-	}
-
-	figure:hover figcaption {
-		opacity: 1;
+	.select-all-button {
+		background-color: transparent;
+		outline: 1px solid white;
+		color: white;
 	}
 
 	.gallery {
 		column-count: 5;
 		column-gap: 1rem;
-	}
-
-	.gallery__item {
-		margin: 0 0 1rem 0;
-		display: inline-block;
-		width: 100%;
-		break-inside: avoid;
-		position: relative;
-		border-radius: 4px;
-		overflow: hidden;
-		background-color: #f0f0f0;
-		transition: aspect-ratio 0.3s ease;
-	}
-
-	.gallery__image {
-		width: 100%;
-		height: 100%;
-		object-fit: cover;
-		display: block;
-	}
-
-	.gallery__caption {
-		padding: 0.5rem;
-		background-color: rgba(255, 255, 255, 0.8);
-		position: absolute;
-		bottom: 0;
-		left: 0;
-		right: 0;
-		opacity: 0;
-		transition: opacity 0.3s ease;
-		z-index: 2;
-	}
-
-	.gallery__title {
-		margin: 0;
-		font-weight: bold;
-		font-size: 0.9rem;
-		white-space: nowrap;
-		overflow: hidden;
-		text-overflow: ellipsis;
-	}
-
-	.gallery__uploader {
-		margin: 0;
-		font-size: 0.8rem;
-	}
-
-	.gallery__uploader-link {
-		color: var(--color-theme-1);
-		text-decoration: none;
-		position: relative;
-		z-index: 3;
-	}
-
-	.gallery__uploader-link:hover {
-		text-decoration: underline;
-	}
-
-	.gallery__item:hover .gallery__caption {
-		opacity: 1;
-	}
-
-	.gallery__overlay {
-		position: absolute;
-		top: 0;
-		left: 0;
-		right: 0;
-		bottom: 0;
-		display: flex;
-		align-items: flex-start;
-		justify-content: flex-end;
-		padding: 0.5rem;
-		z-index: 1;
-	}
-
-	.gallery__checkbox {
-		width: 20px;
-		height: 20px;
-		opacity: 0.7;
-		transition: opacity 0.3s ease;
-		pointer-events: none;
-	}
-
-	.gallery__checkbox:hover {
-		opacity: 1;
 	}
 
 	@media screen and (max-width: 1200px) {
@@ -504,39 +367,10 @@
 		}
 	}
 
-	.loading,
-	.no-more {
-		text-align: center;
-		padding: 1rem;
-		font-style: italic;
-		color: #666;
-	}
-
-	.search-container {
-		display: flex;
-		justify-content: center;
-		margin-bottom: 1rem;
-	}
-
-	.search-container input {
-		padding: 0.5rem;
-		font-size: 1rem;
-		width: 300px;
-	}
-
-	.search-container button {
-		padding: 0.5rem 1rem;
-		font-size: 1rem;
-		background-color: var(--color-theme-1);
-		color: white;
-		border: none;
-		cursor: pointer;
-	}
-
 	.loading {
 		position: fixed;
-		bottom: 20px;
-		right: 20px;
+		top: 0;
+		left: 0;
 		background-color: rgba(0, 0, 0, 0.7);
 		color: white;
 		padding: 10px 20px;
@@ -560,7 +394,7 @@
 	}
 
 	.page-number.active {
-		background-color: var(--color-theme-1);
+		background-color: black;
 		color: white;
 	}
 
@@ -583,5 +417,26 @@
 		color: red;
 		text-align: center;
 		margin-top: 1rem;
+	}
+
+	.search__input {
+		width: 100%;
+	}
+
+	.progress-bar {
+		position: fixed;
+		top: 0;
+		left: 0;
+		width: 100%;
+		height: 20px;
+		background-color: white;
+		border-radius: 8px;
+		overflow: hidden;
+	}
+
+	.progress {
+		height: 24px;
+		background-color: var(--color-primary);
+		transition: width 0.3s ease;
 	}
 </style>

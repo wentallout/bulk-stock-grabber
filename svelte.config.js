@@ -1,15 +1,27 @@
 import adapter from '@sveltejs/adapter-auto';
 import { vitePreprocess } from '@sveltejs/vite-plugin-svelte';
+import { svelteInspector } from '@sveltejs/vite-plugin-svelte-inspector';
+import { defineConfig } from 'vite';
+import { svelte } from '@sveltejs/vite-plugin-svelte';
 
-/** @type {import('@sveltejs/kit').Config} */
-const config = {
+// /** @type {import('@sveltejs/kit').Config} */
+// const config = {
+// 	preprocess: vitePreprocess(),
+// 	kit: {
+// 		adapter: adapter()
+// 	}
+// };
+
+export default defineConfig({
 	preprocess: vitePreprocess(),
 	kit: {
-		// adapter-auto only supports some environments, see https://kit.svelte.dev/docs/adapter-auto for a list.
-		// If your environment is not supported, or you settled on a specific environment, switch out the adapter.
-		// See https://kit.svelte.dev/docs/adapters for more information about adapters.
 		adapter: adapter()
-	}
-};
+	},
+	plugins: [
+		// the svelte plugin is required to work
+		svelte(),
+		svelteInspector({ enabled: true })
+	]
+});
 
-export default config;
+// export default config;

@@ -1,56 +1,53 @@
 <script lang="ts">
-	import { run, stopPropagation, createBubbler } from 'svelte/legacy';
+	import { createBubbler } from 'svelte/legacy';
 
 	const bubble = createBubbler();
-	import { onMount } from 'svelte';
+
+	import { fade } from 'svelte/transition';
 
 	interface Props {
+		id: any;
 		image: any;
 		isSelected: boolean;
 		onToggleSelection: any;
 	}
 
-	let { image, isSelected = $bindable(), onToggleSelection }: Props = $props();
+	let { id, image, isSelected = $bindable(false), onToggleSelection }: Props = $props();
+	let checkboxElement: HTMLInputElement | undefined = $state();
 
 	function handleToggle() {
 		onToggleSelection(image);
-		isSelected = !isSelected;
-		checkboxElement.checked = !checkboxElement.checked;
 	}
 
-	let checkboxElement: HTMLInputElement = $state();
-
-	// Add this function to handle the title click
-	function handleTitleClick(event: Event) {
-		event.stopPropagation();
-	}
+	$effect(() => {
+		if (checkboxElement) {
+			checkboxElement.checked = isSelected;
+		}
+	});
 </script>
 
-<div class="gallery__item" class:selected={isSelected} onclick={handleToggle}>
-	<img class="gallery__image" src={image.urls.small} alt={image.alt_description} loading="lazy" />
+<div
+	{id}
+	transition:fade={{ duration: 300 }}
+	class="gallery__item"
+	class:selected={isSelected}
+	onclick={handleToggle}>
+	<img class="gallery__image" src={image.urls.small} alt={image.alt_description || 'Unsplash Image'} loading="lazy" />
 	<div class="gallery__caption">
 		<a
 			href={image.links.html}
 			target="_blank"
 			rel="noopener noreferrer"
-			class="gallery__title-link"
-			onclick={handleTitleClick}>
+			class="gallery__title-link">
 			<p class="gallery__title">{image.description || 'Untitled'}</p>
 		</a>
 		<p class="gallery__uploader">
 			by <a
 				class="gallery__uploader-link"
-				href={`https://unsplash.com/@${image.user.username}`}
+				href={image.user.links.html}
 				target="_blank"
 				rel="noopener noreferrer"
-				onclick={stopPropagation(bubble('click'))}>{image.user.name}</a>
-
-			on
-			<a
-				href="https://unsplash.com/?utm_source=bulk-stock-grabber
-&utm_medium=referral">
-				Unsplash
-			</a>
+				onclick={bubble('click')}>{image.user.name}</a>
 		</p>
 	</div>
 	<div class="gallery__overlay">
@@ -63,8 +60,6 @@
 </div>
 
 <style>
-	/* ... previous styles ... */
-
 	.gallery__item {
 		margin: 0 0 1rem 0;
 		display: inline-block;
@@ -93,8 +88,9 @@
 	}
 
 	.gallery__caption {
-		padding: 0.5rem;
-		background-color: rgba(255, 255, 255, 0.8);
+		padding: var(--space-xs);
+		background-color: rgba(0, 0, 0, 0.7);
+		color: white;
 		position: absolute;
 		bottom: 0;
 		left: 0;
@@ -102,12 +98,13 @@
 		opacity: 0;
 		transition: opacity 0.3s ease;
 		z-index: 10;
+		font-size: var(--space-xs);
 	}
 
 	.gallery__title {
 		margin: 0;
 		font-weight: bold;
-		font-size: 0.9rem;
+
 		white-space: nowrap;
 		overflow: hidden;
 		text-overflow: ellipsis;
@@ -115,16 +112,11 @@
 
 	.gallery__uploader {
 		margin: 0;
-		font-size: 0.8rem;
+		display: 0;
 	}
 
 	.gallery__uploader-link {
-		color: var(--color-theme-1);
 		text-decoration: none;
-	}
-
-	.gallery__uploader-link:hover {
-		text-decoration: underline;
 	}
 
 	.gallery__item:hover .gallery__caption {

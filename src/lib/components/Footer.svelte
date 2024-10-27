@@ -12,5 +12,6 @@
 		display: flex;
 		justify-content: center;
 		align-items: center;
+		color: var(--text-100);
 	}
 </style>
