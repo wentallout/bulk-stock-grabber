@@ -25,6 +25,7 @@
 	let itemsPerPage = 30;
 	import saveAs from 'file-saver';
 	import { toast } from '$lib/stores/toastStore.svelte';
+	import ProgressBar from '$lib/components/ProgressBar.svelte';
 
 	// Replace the existing selectAllState with a simple boolean
 	let selectAll = $state(false);
@@ -132,36 +133,48 @@
 
 	async function downloadImages() {
 		if (selectedImages.length === 0) {
-			alert('Please select at least one image to download.');
+			toast.push('Please select at least one image to download.');
 			return;
 		}
 
 		downloadLoading = true;
 		downloadProgress = 0;
-		error = '';
 
 		try {
 			const zip = new JSZip();
 			const totalImages = selectedImages.length;
 
-			for (let i = 0; i < totalImages; i++) {
-				const image = selectedImages[i];
-				const response = await fetch(image.urls.full);
-				const blob = await response.blob();
-				zip.file(`${image.id}.jpg`, blob);
+			// Use Promise.all to handle all downloads concurrently while tracking progress
+			await Promise.all(
+				selectedImages.map(async (image, index) => {
+					try {
+						const response = await fetch(image.urls.full);
+						const blob = await response.blob();
+						zip.file(`${image.id}.jpg`, blob);
 
-				// Update progress
-				downloadProgress = ((i + 1) / totalImages) * 100;
-			}
+						// Update progress after each image is processed
+						downloadProgress = Math.round(((index + 1) / totalImages) * 100);
+					} catch (err) {
+						console.error(`Error downloading image ${image.id}:`, err);
+						throw err;
+					}
+				})
+			);
 
-			const content = await zip.generateAsync({ type: 'blob' });
+			const content = await zip.generateAsync({
+				type: 'blob',
+				onUpdate: (metadata) => {
+					// Update progress during zip generation
+					if (metadata.percent) {
+						downloadProgress = Math.round(metadata.percent);
+					}
+				}
+			});
 			saveAs(content, 'unsplash_images.zip');
-
 			toast.push('Download completed!');
-			// alert('Download completed!');
 		} catch (err) {
 			console.error('Error in downloadImages:', err);
-			error = err.message || 'An error occurred while downloading images. Please try again.';
+			toast.push('An error occurred while downloading images. Please try again.');
 		} finally {
 			downloadLoading = false;
 			downloadProgress = 0;
@@ -177,6 +190,10 @@
 		}
 	}
 </script>
+
+{#if downloadLoading}
+	<ProgressBar progress={downloadProgress} />
+{/if}
 
 <div class="search-container pad">
 	<div class="search__title">
@@ -228,7 +245,10 @@
 					{selectAll ? 'Deselect All' : 'Select All Images'}
 				</button>
 
-				<button onclick={downloadImages} disabled={downloadLoading} class="btn download-button">
+				<button
+					onclick={downloadImages}
+					disabled={downloadLoading}
+					class="btn download-button btn--primary">
 					<PhDownload width="24" height="24" />
 					{downloadLoading
 						? 'Downloading...'
@@ -236,12 +256,6 @@
 				</button>
 			</div>
 		{/if}
-	</div>
-{/if}
-
-{#if downloadLoading}
-	<div class="progress-bar">
-		<div class="progress" style="width: {downloadProgress}%"></div>
 	</div>
 {/if}
 
@@ -318,7 +332,6 @@
 		left: 50%;
 		transform: translateX(-50%);
 		background-color: rgba(0, 0, 0, 0.8);
-		padding: 0.5rem;
 		display: flex;
 		flex-direction: column;
 		justify-content: center;
@@ -328,19 +341,13 @@
 		width: 100%;
 	}
 
-	.download-button,
-	.select-all-button {
-		gap: 0.5rem;
-		color: black;
-		border: none;
-
-		cursor: pointer;
-		transition: background-color 0.3s ease;
+	.fixed-menu:has(.download-buttons) {
+		padding: var(--space-xs) var(--space-s);
 	}
 
 	.select-all-button {
 		background-color: transparent;
-		outline: 1px solid white;
+		border: 1px solid white;
 		color: white;
 	}
 
@@ -421,22 +428,5 @@
 
 	.search__input {
 		width: 100%;
-	}
-
-	.progress-bar {
-		position: fixed;
-		top: 0;
-		left: 0;
-		width: 100%;
-		height: 20px;
-		background-color: white;
-		border-radius: 8px;
-		overflow: hidden;
-	}
-
-	.progress {
-		height: 24px;
-		background-color: var(--color-primary);
-		transition: width 0.3s ease;
 	}
 </style>
