@@ -99,7 +99,7 @@
 
 	function generatePageNumbers() {
 		const pageNumbers = [];
-		const maxVisiblePages = 5;
+		const maxVisiblePages = 7;
 
 		if (totalPages <= maxVisiblePages) {
 			for (let i = 1; i <= totalPages; i++) {
