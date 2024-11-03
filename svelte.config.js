@@ -1,6 +1,6 @@
 import adapter from '@sveltejs/adapter-netlify';
 import { vitePreprocess } from '@sveltejs/vite-plugin-svelte';
-import { svelteInspector } from '@sveltejs/vite-plugin-svelte-inspector';
+
 import { defineConfig } from 'vite';
 import { svelte } from '@sveltejs/vite-plugin-svelte';
 
@@ -19,8 +19,7 @@ export default defineConfig({
 	},
 	plugins: [
 		// the svelte plugin is required to work
-		svelte(),
-		svelteInspector({ enabled: true })
+		svelte()
 	]
 });
 
