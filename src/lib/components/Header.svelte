@@ -26,7 +26,7 @@
 	}
 
 	.header__logo {
-		color: white;
+		color: var(--text-900);
 	}
 
 	.header__social {

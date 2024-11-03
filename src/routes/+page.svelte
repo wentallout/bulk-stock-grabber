@@ -197,7 +197,7 @@
 
 <div class="search-container pad">
 	<div class="search__title">
-		<p>Free images. Download in bulk.</p>
+		<p>Download free images in bulk</p>
 	</div>
 	<div class="input-container">
 		<input
@@ -206,8 +206,8 @@
 			bind:value={searchQuery}
 			placeholder="Search photos and illustrations"
 			onkeyup={(e) => e.key === 'Enter' && searchImages()} />
-		<button onclick={() => searchImages()}>
-			<PhMagnifyingGlass width="24" height="24" />
+		<button class="btn btn--primary search__btn" onclick={() => searchImages()}>
+			<PhMagnifyingGlass width="24" height="24" color="black" />
 		</button>
 	</div>
 </div>
@@ -238,9 +238,9 @@
 			<div class="download-buttons">
 				<button onclick={selectAllImages} class="btn select-all-button">
 					{#if selectAll}
-						<PhCheckSquare width="24" height="24" />
-					{:else}
 						<PhX width="24" height="24" />
+					{:else}
+						<PhCheckSquare width="24" height="24" />
 					{/if}
 					{selectAll ? 'Deselect All' : 'Select All Images'}
 				</button>
@@ -275,13 +275,25 @@
 	.input-container {
 		display: flex;
 		flex-direction: row;
+		border-radius: 1rem;
+		overflow: hidden;
+
+		button {
+			border-radius: 0;
+		}
+	}
+
+	.search__btn {
+		aspect-ratio: 1;
+		width: auto;
+		height: 100%;
 	}
 
 	.search__title {
 		display: flex;
 		flex-direction: row;
 		font-weight: 600;
-		font-size: var(--step-3);
+		font-size: var(--step-4);
 		margin-bottom: var(--space-xs);
 	}
 
@@ -301,7 +313,7 @@
 		display: flex;
 		flex-direction: column;
 		justify-content: center;
-		margin-bottom: var(--space-s);
+		margin-bottom: var(--space-xl);
 		width: 100%;
 		height: 30dvh;
 		background: url('/images/sj-1.jpg') no-repeat bottom center;

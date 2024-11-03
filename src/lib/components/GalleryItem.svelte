@@ -32,7 +32,11 @@
 	class="gallery__item"
 	class:selected={isSelected}
 	onclick={handleToggle}>
-	<img class="gallery__image" src={image.urls.small} alt={image.alt_description || 'Unsplash Image'} loading="lazy" />
+	<img
+		class="gallery__image"
+		src={image.urls.small}
+		alt={image.alt_description || 'Unsplash Image'}
+		loading="lazy" />
 	<div class="gallery__caption">
 		<a
 			href={image.links.html}
@@ -72,10 +76,10 @@
 	}
 
 	.gallery__item.selected {
-		outline: 5px solid blue;
+		outline: 2px solid var(--primary-500);
 
 		& .gallery__image {
-			scale: 1.2;
+			scale: 1.1;
 			filter: brightness(0.5) sepia(1.5);
 			transition: all 0.3s ease;
 		}

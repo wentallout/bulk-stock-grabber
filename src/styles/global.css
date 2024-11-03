@@ -8,7 +8,7 @@ body {
 	min-height: 100dvh;
 	padding-inline: var(--space-xs);
 	margin: 0;
-	background-color: #121212;	
+	background-color: var(--background-50);	
 }
 
 .pad 
@@ -43,8 +43,8 @@ input,
 button {
 	font-size: inherit;
 	font-family: inherit;
-	
-
+	border:0;
+	outline:0;
 }
 
 button:focus:not(:focus-visible) {
@@ -74,7 +74,7 @@ button:focus:not(:focus-visible) {
 .btn--primary 
 {
 	background-color: var(--primary-500);
-	color: var(--text-900);
+	color: var(--text-50);
 }
 
 

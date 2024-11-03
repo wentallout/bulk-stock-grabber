@@ -1,17 +1,16 @@
-<footer>
-	<p>Bulk Stock Images Grabber by Khoa Nguyen</p>
+<footer class="pad">
+	<p>Stock Grabber by Khoa Nguyen</p>
+	<p>wentallout@gmail.com</p>
 	<p>wentallout.io.vn</p>
-	<p>visit <a href="https://kit.svelte.dev">kit.svelte.dev</a> to learn SvelteKit</p>
 </footer>
 
 <style>
 	footer {
+		margin-top: var(--space-l);
 		width: 100%;
-		max-width: 64rem;
-		margin: 0 auto;
 		display: flex;
-		justify-content: center;
-		align-items: center;
-		color: var(--text-100);
+		flex-direction: column;
+		color: var(--text-700);
+		font-size: var(--step--1);
 	}
 </style>
